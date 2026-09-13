@@ -92,27 +92,33 @@ class BeatmapsController extends Controller
         $totalsEnabled = $GLOBALS['cfg']['osu']['scores']['leaderboard_totals_enabled'];
 
         if ($isApi && $totalsEnabled) {
-            $cacheKey = match ($type) {
-                'country' => "lb_count_country:{$esFetch->baseParams->getCountryCode()}-",
-                'global' => 'lb_count_global:',
-                default => null,
-            };
+            $fetchedScoreCount = count($scores);
 
-            if ($cacheKey !== null) {
-                $sortedMods = implode(',', array_sort($mods));
-                $legacyMode = $isLegacy ? '1' : '0';
-                $cacheKey .= "{$beatmap->getKey()}-{$beatmap->approved}-{$legacyMode}-{$rulesetId}-{$sortedMods}";
-
-                $count = get_int(\Cache::get($cacheKey));
-
-                if ($count === null) {
-                    $count = UserRank::getCount($esFetch->baseParams);
-
-                    // use count as TTL, matches `global-rank-lookup-cache`
-                    \Cache::put($cacheKey, $count, max(600, $count));
-                }
+            if ($fetchedScoreCount < $esFetch->baseParams->size) {
+                $count = $fetchedScoreCount;
             } else {
-                $count = UserRank::getCount($esFetch->baseParams);
+                $cacheKey = match ($type) {
+                    'country' => "lb_count_country:{$esFetch->baseParams->getCountryCode()}-",
+                    'global' => 'lb_count_global:',
+                    default => null,
+                };
+
+                if ($cacheKey !== null) {
+                    $sortedMods = implode(',', array_sort($mods));
+                    $legacyMode = $isLegacy ? '1' : '0';
+                    $cacheKey .= "{$beatmap->getKey()}-{$beatmap->approved}-{$legacyMode}-{$rulesetId}-{$sortedMods}";
+
+                    $count = get_int(\Cache::get($cacheKey));
+
+                    if ($count === null) {
+                        $count = UserRank::getCount($esFetch->baseParams);
+
+                        // use count as TTL, matches `global-rank-lookup-cache`
+                        \Cache::put($cacheKey, $count, max(600, $count));
+                    }
+                } else {
+                    $count = UserRank::getCount($esFetch->baseParams);
+                }
             }
 
             $results['score_count'] = $count;
